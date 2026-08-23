@@ -96,9 +96,11 @@
   <h1>Album Foto</h1>
   <p class="sub">Scatta o scegli le foto e condividile con noi</p>
 
-  <input type="file" id="input-foto" accept="image/*" multiple style="display:none" />
+  <input type="file" id="input-galleria" accept="image/*" multiple style="display:none" />
+  <input type="file" id="input-fotocamera" accept="image/*" capture="environment" style="display:none" />
 
-  <button class="btn btn-primary" id="btn-scegli" type="button">Scatta o scegli foto</button>
+  <button class="btn btn-primary" id="btn-fotocamera" type="button">Scatta una foto</button>
+  <button class="btn btn-secondary" id="btn-galleria" type="button">Scegli dalla galleria</button>
 
   <div class="thumbs" id="thumbs"></div>
   <p class="count" id="count"></p>
@@ -111,8 +113,10 @@
   <p class="status" id="status"></p>
 
   <script>
-    var input = document.getElementById("input-foto");
-    var btnScegli = document.getElementById("btn-scegli");
+    var inputGalleria = document.getElementById("input-galleria");
+    var inputFotocamera = document.getElementById("input-fotocamera");
+    var btnFotocamera = document.getElementById("btn-fotocamera");
+    var btnGalleria = document.getElementById("btn-galleria");
     var btnInvia = document.getElementById("btn-invia");
     var thumbs = document.getElementById("thumbs");
     var countEl = document.getElementById("count");
@@ -149,18 +153,35 @@
       btnInvia.disabled = selezionate.length === 0;
     }
 
-    btnScegli.addEventListener("click", function () {
+    function apriInput(input) {
       input.value = "";
       input.click();
+    }
+
+    btnFotocamera.addEventListener("click", function () {
+      apriInput(inputFotocamera);
     });
 
-    input.addEventListener("change", function () {
-      for (var i = 0; i < input.files.length; i++) {
+    btnGalleria.addEventListener("click", function () {
+      apriInput(inputGalleria);
+    });
+
+    inputGalleria.addEventListener("change", function () {
+      aggiungiFile(this.files);
+    });
+
+    inputFotocamera.addEventListener("change", function () {
+      selezionate = [];
+      aggiungiFile(this.files);
+    });
+
+    function aggiungiFile(files) {
+      for (var i = 0; i < files.length; i++) {
         if (selezionate.length >= 30) break;
-        selezionate.push(input.files[i]);
+        selezionate.push(files[i]);
       }
       aggiornaUI();
-    });
+    }
 
     btnInvia.addEventListener("click", function () {
       if (selezionate.length === 0) return;
@@ -168,7 +189,8 @@
       statusEl.textContent = "";
       statusEl.className = "status";
       btnInvia.disabled = true;
-      btnScegli.disabled = true;
+      btnFotocamera.disabled = true;
+      btnGalleria.disabled = true;
       progressWrap.style.display = "block";
       progressBar.style.width = "0%";
 
@@ -186,7 +208,8 @@
       };
       xhr.onload = function () {
         progressWrap.style.display = "none";
-        btnScegli.disabled = false;
+        btnFotocamera.disabled = false;
+        btnGalleria.disabled = false;
         if (xhr.status === 200) {
           selezionate = [];
           aggiornaUI();
@@ -202,7 +225,8 @@
       };
       xhr.onerror = function () {
         progressWrap.style.display = "none";
-        btnScegli.disabled = false;
+        btnFotocamera.disabled = false;
+        btnGalleria.disabled = false;
         btnInvia.disabled = false;
         statusEl.textContent = "Connessione non riuscita, riprova";
         statusEl.className = "status err";

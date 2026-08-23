@@ -1,0 +1,14 @@
+{
+  "name": "album-foto",
+  "version": "1.0.0",
+  "description": "Web app per raccogliere foto dagli invitati via QR code",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^2.0.0"
+  }
+}

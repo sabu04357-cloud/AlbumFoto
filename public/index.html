@@ -120,10 +120,8 @@
 
   <input type="file" id="input-galleria" accept="image/*,video/*" multiple style="display:none" />
   <input type="file" id="input-fotocamera" accept="image/*" capture="environment" style="display:none" />
-  <input type="file" id="input-video" accept="video/*" capture="environment" style="display:none" />
 
-  <button class="btn btn-primary" id="btn-fotocamera" type="button">Scatta foto</button>
-  <button class="btn btn-primary" id="btn-video" type="button">Scatta video</button>
+  <button class="btn btn-primary" id="btn-fotocamera" type="button">Scatta foto e video</button>
   <button class="btn btn-secondary" id="btn-galleria" type="button">Scegli dalla galleria</button>
 
   <div class="thumbs" id="thumbs"></div>
@@ -139,9 +137,7 @@
   <script>
     var inputGalleria = document.getElementById("input-galleria");
     var inputFotocamera = document.getElementById("input-fotocamera");
-    var inputVideo = document.getElementById("input-video");
     var btnFotocamera = document.getElementById("btn-fotocamera");
-    var btnVideo = document.getElementById("btn-video");
     var btnGalleria = document.getElementById("btn-galleria");
     var btnInvia = document.getElementById("btn-invia");
     var thumbs = document.getElementById("thumbs");
@@ -199,10 +195,6 @@
       apriInput(inputFotocamera);
     });
 
-    btnVideo.addEventListener("click", function () {
-      apriInput(inputVideo);
-    });
-
     btnGalleria.addEventListener("click", function () {
       apriInput(inputGalleria);
     });
@@ -212,11 +204,6 @@
     });
 
     inputFotocamera.addEventListener("change", function () {
-      selezionate = [];
-      aggiungiFile(this.files);
-    });
-
-    inputVideo.addEventListener("change", function () {
       selezionate = [];
       aggiungiFile(this.files);
     });
@@ -236,7 +223,6 @@
       statusEl.className = "status";
       btnInvia.disabled = true;
       btnFotocamera.disabled = true;
-      btnVideo.disabled = true;
       btnGalleria.disabled = true;
       progressWrap.style.display = "block";
       progressBar.style.width = "0%";
@@ -256,7 +242,6 @@
       xhr.onload = function () {
         progressWrap.style.display = "none";
         btnFotocamera.disabled = false;
-        btnVideo.disabled = false;
         btnGalleria.disabled = false;
         if (xhr.status === 200) {
           selezionate = [];
@@ -274,7 +259,6 @@
       xhr.onerror = function () {
         progressWrap.style.display = "none";
         btnFotocamera.disabled = false;
-        btnVideo.disabled = false;
         btnGalleria.disabled = false;
         btnInvia.disabled = false;
         statusEl.textContent = "Connessione non riuscita, riprova";

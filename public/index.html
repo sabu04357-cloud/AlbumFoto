@@ -118,8 +118,8 @@
   <h1>Album Foto</h1>
   <p class="sub">Scatta o scegli le foto e condividile con noi</p>
 
-  <input type="file" id="input-galleria" accept="image/*" multiple style="display:none" />
-  <input type="file" id="input-fotocamera" accept="image/*" capture="environment" style="display:none" />
+  <input type="file" id="input-galleria" accept="image/*,video/*" multiple style="display:none" />
+  <input type="file" id="input-fotocamera" accept="image/*,video/*" capture="environment" style="display:none" />
 
   <button class="btn btn-primary" id="btn-fotocamera" type="button">Scatta una foto</button>
   <button class="btn btn-secondary" id="btn-galleria" type="button">Scegli dalla galleria</button>
@@ -153,10 +153,21 @@
       selezionate.forEach(function (file, i) {
         var div = document.createElement("div");
         div.className = "thumb";
-        var img = document.createElement("img");
-        img.src = URL.createObjectURL(file);
-        img.alt = "";
-        img.onload = function () { URL.revokeObjectURL(img.src); };
+        var isVideo = file.type && file.type.startsWith("video/");
+        var preview;
+        if (isVideo) {
+          preview = document.createElement("video");
+          preview.src = URL.createObjectURL(file);
+          preview.muted = true;
+          preview.loop = true;
+          preview.playsInline = true;
+          preview.autoplay = true;
+        } else {
+          preview = document.createElement("img");
+          preview.src = URL.createObjectURL(file);
+          preview.alt = "";
+        }
+        preview.onload = function () { URL.revokeObjectURL(preview.src || preview.currentSrc); };
         var rm = document.createElement("button");
         rm.className = "remove";
         rm.type = "button";
@@ -166,12 +177,12 @@
           selezionate.splice(i, 1);
           aggiornaUI();
         };
-        div.appendChild(img);
+        div.appendChild(preview);
         div.appendChild(rm);
         thumbs.appendChild(div);
       });
       countEl.textContent =
-        selezionate.length > 0 ? selezionate.length + " foto selezionate" : "";
+        selezionate.length > 0 ? selezionate.length + " file selezionati" : "";
       btnInvia.disabled = selezionate.length === 0;
     }
 
@@ -199,7 +210,7 @@
 
     function aggiungiFile(files) {
       for (var i = 0; i < files.length; i++) {
-        if (selezionate.length >= 30) break;
+        if (selezionate.length >= 60) break;
         selezionate.push(files[i]);
       }
       aggiornaUI();

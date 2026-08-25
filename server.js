@@ -20,9 +20,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const ok = /^image\/(jpeg|png|heic|heif|webp)$/i.test(file.mimetype);
+    const ok = /^image\/(jpeg|png|heic|heif|webp)$/i.test(file.mimetype) ||
+               /^video\/(mp4|quicktime|x-msvideo|webm)$/i.test(file.mimetype);
     if (ok) return cb(null, true);
     cb(new Error("Formato non supportato"));
   },
@@ -36,7 +37,7 @@ app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
-app.post("/upload", upload.array("foto", 30), (req, res) => {
+app.post("/upload", upload.array("foto", 60), (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: "Nessuna foto ricevuta" });
   }
@@ -57,7 +58,7 @@ app.get("/api/photos", (req, res) => {
   }
   try {
     const files = fs.readdirSync(UPLOAD_DIR)
-      .filter(f => /\.(jpe?g|png|heic|heif|webp)$/i.test(f))
+      .filter(f => /\.(jpe?g|png|heic|heif|webp|mp4|mov|avi|webm)$/i.test(f))
       .map(f => {
         const stat = fs.statSync(path.join(UPLOAD_DIR, f));
         return { name: f, size: stat.size, created: stat.birthtimeMs };

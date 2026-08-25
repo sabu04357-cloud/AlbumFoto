@@ -199,9 +199,20 @@
         photos.forEach(function (p) {
           var card = document.createElement("div");
           card.className = "card";
-          var img = document.createElement("img");
-          img.src = "/foto/" + p.name;
-          img.loading = "lazy";
+          var isVideo = /\.(mp4|mov|avi|webm)$/i.test(p.name);
+          var preview;
+          if (isVideo) {
+            preview = document.createElement("video");
+            preview.src = "/foto/" + p.name;
+            preview.muted = true;
+            preview.loop = true;
+            preview.playsInline = true;
+            preview.autoplay = true;
+          } else {
+            preview = document.createElement("img");
+            preview.src = "/foto/" + p.name;
+            preview.loading = "lazy";
+          }
           var dl = document.createElement("button");
           dl.className = "dl";
           dl.textContent = "\u2B07";
@@ -211,7 +222,7 @@
             scarica(p.name);
           };
           card.onclick = function () { apriLightbox("/foto/" + p.name); };
-          card.appendChild(img);
+          card.appendChild(preview);
           card.appendChild(dl);
           grid.appendChild(card);
         });
@@ -232,7 +243,25 @@
     }
 
     function apriLightbox(src) {
-      lbImg.src = src;
+      var isVideo = /\.(mp4|mov|avi|webm)$/i.test(src);
+      if (isVideo) {
+        var v = document.createElement("video");
+        v.src = src;
+        v.controls = true;
+        v.autoplay = true;
+        v.style.maxWidth = "95vw";
+        v.style.maxHeight = "90vh";
+        v.style.borderRadius = "6px";
+        lbImg.replaceWith(v);
+        v.id = "lb-img";
+        lbImg = v;
+      } else {
+        var i = document.createElement("img");
+        i.src = src;
+        i.id = "lb-img";
+        lbImg.replaceWith(i);
+        lbImg = i;
+      }
       lightbox.classList.add("open");
     }
     document.getElementById("lb-close").addEventListener("click", function () {

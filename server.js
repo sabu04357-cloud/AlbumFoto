@@ -3,7 +3,9 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+const archiver = require("archiver");
 
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "albumfoto2025";
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -27,8 +29,12 @@ const upload = multer({
 });
 
 const app = express();
-app.use(express.static(path.join(__dirname, "public")));
+
 app.use("/foto", express.static(UPLOAD_DIR));
+
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
 
 app.post("/upload", upload.array("foto", 30), (req, res) => {
   if (!req.files || req.files.length === 0) {
@@ -36,6 +42,62 @@ app.post("/upload", upload.array("foto", 30), (req, res) => {
   }
   res.json({ ok: true, count: req.files.length });
 });
+
+app.post("/api/login", express.json(), (req, res) => {
+  if (req.body.password === ADMIN_PASSWORD) {
+    return res.json({ ok: true });
+  }
+  res.status(401).json({ error: "Password errata" });
+});
+
+app.get("/api/photos", (req, res) => {
+  const auth = req.headers.authorization;
+  if (auth !== "Bearer " + ADMIN_PASSWORD) {
+    return res.status(401).json({ error: "Non autorizzato" });
+  }
+  try {
+    const files = fs.readdirSync(UPLOAD_DIR)
+      .filter(f => /\.(jpe?g|png|heic|heif|webp)$/i.test(f))
+      .map(f => {
+        const stat = fs.statSync(path.join(UPLOAD_DIR, f));
+        return { name: f, size: stat.size, created: stat.birthtimeMs };
+      })
+      .sort((a, b) => b.created - a.created);
+    res.json({ photos: files });
+  } catch (e) {
+    res.json({ photos: [] });
+  }
+});
+
+app.get("/api/download/:filename", (req, res) => {
+  const auth = req.headers.authorization;
+  if (auth !== "Bearer " + ADMIN_PASSWORD) {
+    return res.status(401).json({ error: "Non autorizzato" });
+  }
+  const file = path.join(UPLOAD_DIR, req.params.filename);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: "File non trovato" });
+  res.download(file);
+});
+
+app.get("/api/zip", (req, res) => {
+  const auth = req.headers.authorization;
+  if (auth !== "Bearer " + ADMIN_PASSWORD) {
+    return res.status(401).json({ error: "Non autorizzato" });
+  }
+  const files = fs.readdirSync(UPLOAD_DIR)
+    .filter(f => /\.(jpe?g|png|heic|heif|webp)$/i.test(f));
+  if (files.length === 0) return res.status(404).json({ error: "Nessuna foto" });
+
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", "attachment; filename=album-foto.zip");
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  archive.on("error", err => res.status(500).json({ error: err.message }));
+  archive.pipe(res);
+  files.forEach(f => archive.file(path.join(UPLOAD_DIR, f), { name: f }));
+  archive.finalize();
+});
+
+app.use(express.static(path.join(__dirname, "public")));
 
 app.use((err, req, res, next) => {
   if (err.code === "LIMIT_FILE_SIZE") {

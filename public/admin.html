@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#c8b89a" />
+  <title>Album Foto — Galleria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      background: #f5f0e8;
+      color: #3d3425;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: max(40px, env(safe-area-inset-top)) 20px max(40px, env(safe-area-inset-bottom));
+    }
+    h1 { font-size: 1.8rem; font-weight: 600; color: #2e2415; text-align: center; margin-bottom: 6px; }
+    .sub { color: #8a7d6b; font-style: italic; font-size: 1.05rem; margin-bottom: 32px; text-align: center; }
+    input[type="password"] {
+      width: 100%;
+      max-width: 340px;
+      padding: 14px 18px;
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 1.05rem;
+      border: 2px solid #c4b896;
+      border-radius: 6px;
+      background: #fff;
+      color: #3d3425;
+      outline: none;
+      margin-bottom: 16px;
+    }
+    input[type="password"]:focus { border-color: #a6926e; }
+    .btn {
+      width: 100%;
+      max-width: 340px;
+      padding: 16px 24px;
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: transform 0.1s ease;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: default; }
+    .btn-primary { background: #a6926e; color: #fff; border: 2px solid #8a7a5a; box-shadow: 0 2px 8px rgba(120,100,60,0.25); }
+    .btn-secondary { background: transparent; color: #a6926e; border: 2px solid #c4b896; }
+    .err { color: #9e3030; font-size: 0.95rem; margin-bottom: 12px; min-height: 1.2em; }
+    .toolbar { width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
+    .count { color: #8a7d6b; font-size: 1rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      width: 100%;
+      max-width: 800px;
+    }
+    .card {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #e8dfd1;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .card:active { border-color: #a6926e; }
+    .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .card .dl {
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(245,240,232,0.92);
+      border: 1.5px solid #8a7a5a;
+      color: #3d3425;
+      font-size: 16px;
+      line-height: 30px;
+      text-align: center;
+      cursor: pointer;
+      display: none;
+    }
+    .card:hover .dl { display: block; }
+    .empty { color: #8a7d6b; font-style: italic; margin-top: 60px; text-align: center; }
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(30,25,15,0.92);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img { max-width: 95vw; max-height: 90vh; border-radius: 6px; }
+    .lightbox .close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(245,240,232,0.9);
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: #3d3425;
+    }
+    @media (max-width: 500px) { .grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); } }
+  </style>
+</head>
+<body>
+
+  <div id="login-view">
+    <h1>Galleria Privata</h1>
+    <p class="sub">Accedi per visualizzare le foto</p>
+    <input type="password" id="pwd" placeholder="Password" />
+    <p class="err" id="err"></p>
+    <button class="btn btn-primary" id="btn-login">Accedi</button>
+  </div>
+
+  <div id="gallery-view" style="display:none; width:100%; max-width:800px; text-align:center;">
+    <h1>Le tue foto</h1>
+    <p class="sub" id="gallery-sub"></p>
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button class="btn btn-secondary" id="btn-zip" style="width:auto; padding:12px 24px; max-width:none;">Scarica tutte (ZIP)</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <p class="empty" id="empty" style="display:none;">Nessuna foto caricata ancora</p>
+  </div>
+
+  <div class="lightbox" id="lightbox">
+    <img id="lb-img" src="" />
+    <button class="close" id="lb-close">&times;</button>
+  </div>
+
+  <script>
+    var TOKEN = "";
+    var loginView = document.getElementById("login-view");
+    var galleryView = document.getElementById("gallery-view");
+    var errEl = document.getElementById("err");
+    var pwdInput = document.getElementById("pwd");
+    var grid = document.getElementById("grid");
+    var countEl = document.getElementById("count");
+    var subEl = document.getElementById("gallery-sub");
+    var emptyEl = document.getElementById("empty");
+    var lightbox = document.getElementById("lightbox");
+    var lbImg = document.getElementById("lb-img");
+
+    function api(path, opts) {
+      var h = Object.assign({ "Authorization": "Bearer " + TOKEN }, (opts && opts.headers) || {});
+      return fetch(path, Object.assign({}, opts, { headers: h }));
+    }
+
+    document.getElementById("btn-login").addEventListener("click", function () {
+      var p = pwdInput.value.trim();
+      if (!p) return;
+      fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: p })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok) {
+          TOKEN = p;
+          loginView.style.display = "none";
+          galleryView.style.display = "block";
+          caricaFoto();
+        } else {
+          errEl.textContent = d.error || "Password errata";
+        }
+      }).catch(function () {
+        errEl.textContent = "Connessione non riuscita";
+      });
+    });
+
+    pwdInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") document.getElementById("btn-login").click();
+    });
+
+    function caricaFoto() {
+      api("/api/photos").then(function (r) { return r.json(); }).then(function (d) {
+        var photos = d.photos || [];
+        subEl.textContent = photos.length > 0
+          ? photos.length + " foto caricate dagli invitati"
+          : "Nessuna foto ancora";
+        countEl.textContent = photos.length + " foto";
+        grid.innerHTML = "";
+        emptyEl.style.display = photos.length === 0 ? "block" : "none";
+        photos.forEach(function (p) {
+          var card = document.createElement("div");
+          card.className = "card";
+          var img = document.createElement("img");
+          img.src = "/foto/" + p.name;
+          img.loading = "lazy";
+          var dl = document.createElement("button");
+          dl.className = "dl";
+          dl.textContent = "\u2B07";
+          dl.setAttribute("aria-label", "Scarica");
+          dl.onclick = function (e) {
+            e.stopPropagation();
+            scarica(p.name);
+          };
+          card.onclick = function () { apriLightbox("/foto/" + p.name); };
+          card.appendChild(img);
+          card.appendChild(dl);
+          grid.appendChild(card);
+        });
+      });
+    }
+
+    function scarica(name) {
+      var a = document.createElement("a");
+      a.href = "/api/download/" + encodeURIComponent(name);
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function apriLightbox(src) {
+      lbImg.src = src;
+      lightbox.classList.add("open");
+    }
+    document.getElementById("lb-close").addEventListener("click", function () {
+      lightbox.classList.remove("open");
+    });
+    lightbox.addEventListener("click", function (e) {
+      if (e.target === lightbox) lightbox.classList.remove("open");
+    });
+
+    document.getElementById("btn-zip").addEventListener("click", function () {
+      var a = document.createElement("a");
+      a.href = "/api/zip";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  </script>
+</body>
+</html>

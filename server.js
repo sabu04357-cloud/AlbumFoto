@@ -102,7 +102,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use((err, req, res, next) => {
   if (err.code === "LIMIT_FILE_SIZE") {
-    return res.status(400).json({ error: "Foto troppo grande (max 25MB)" });
+    return res.status(400).json({ error: "File troppo grande (max 100MB)" });
   }
   res.status(400).json({ error: err.message || "Errore durante il caricamento" });
 });

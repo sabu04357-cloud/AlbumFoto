@@ -219,12 +219,16 @@
     }
 
     function scarica(name) {
-      var a = document.createElement("a");
-      a.href = "/api/download/" + encodeURIComponent(name);
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      api("/api/download/" + encodeURIComponent(name)).then(function (r) {
+        return r.blob();
+      }).then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
     }
 
     function apriLightbox(src) {
@@ -239,12 +243,16 @@
     });
 
     document.getElementById("btn-zip").addEventListener("click", function () {
-      var a = document.createElement("a");
-      a.href = "/api/zip";
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      api("/api/zip").then(function (r) {
+        return r.blob();
+      }).then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "album-foto.zip";
+        a.click();
+        URL.revokeObjectURL(url);
+      });
     });
   </script>
 </body>

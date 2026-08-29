@@ -210,7 +210,7 @@
 
     function aggiungiFile(files) {
       for (var i = 0; i < files.length; i++) {
-        if (selezionate.length >= 60) break;
+        if (selezionate.length >= 300) break;
         selezionate.push(files[i]);
       }
       aggiornaUI();
@@ -227,44 +227,81 @@
       progressWrap.style.display = "block";
       progressBar.style.width = "0%";
 
-      var formData = new FormData();
-      selezionate.forEach(function (f) {
-        formData.append("foto", f, f.name || "foto.jpg");
-      });
+      var errore = 0;
+      var msgErrore = "";
+      var fatto = 0;
+      var inviato = 0;
+      var totale = 0;
+      selezionate.forEach(function (f) { totale += f.size; });
 
-      var xhr = new XMLHttpRequest();
-      xhr.open("POST", "/upload");
-      xhr.upload.onprogress = function (e) {
-        if (e.lengthComputable) {
-          progressBar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+      var BATCH = 10;
+      var CONCORRENTI = 4;
+      var coda = [];
+      for (var i = 0; i < selezionate.length; i += BATCH) {
+        coda.push(selezionate.slice(i, i + BATCH));
+      }
+      var indiceCoda = 0;
+
+      function progress(pct) {
+        progressBar.style.width = pct + "%";
+      }
+
+      function inviaBatch(batch) {
+        var body = new FormData();
+        batch.forEach(function (f) {
+          body.append("foto", f, f.name || "foto.jpg");
+        });
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/upload");
+        xhr.upload.onprogress = function (e) {
+          if (e.lengthComputable && totale > 0) {
+            inviato += e.loaded;
+            progress(Math.min(100, Math.round((inviato / totale) * 100)));
+          }
+        };
+        xhr.onload = function () {
+          if (xhr.status !== 200) {
+            errore++;
+            try { msgErrore = JSON.parse(xhr.responseText).error || msgErrore; } catch (e) {}
+          }
+          prossimo();
+        };
+        xhr.onerror = function () {
+          errore++;
+          prossimo();
+        };
+        xhr.send(body);
+      }
+
+      function prossimo() {
+        fatto++;
+        if (indiceCoda < coda.length) {
+          inviaBatch(coda[indiceCoda++]);
+        } else if (fatto === coda.length) {
+          fine();
         }
-      };
-      xhr.onload = function () {
+      }
+
+      function fine() {
         progressWrap.style.display = "none";
         btnFotocamera.disabled = false;
         btnGalleria.disabled = false;
-        if (xhr.status === 200) {
+        if (errore === 0) {
           selezionate = [];
           aggiornaUI();
+          progress(100);
           statusEl.textContent = "Foto inviate. Grazie!";
           statusEl.className = "status ok";
         } else {
-          var msg = "Errore durante l'invio";
-          try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
-          statusEl.textContent = msg;
+          statusEl.textContent = msgErrore || (errore + " gruppo non inviato, riprova");
           statusEl.className = "status err";
           btnInvia.disabled = false;
         }
-      };
-      xhr.onerror = function () {
-        progressWrap.style.display = "none";
-        btnFotocamera.disabled = false;
-        btnGalleria.disabled = false;
-        btnInvia.disabled = false;
-        statusEl.textContent = "Connessione non riuscita, riprova";
-        statusEl.className = "status err";
-      };
-      xhr.send(formData);
+      }
+
+      for (var k = 0; k < CONCORRENTI; k++) {
+        if (indiceCoda < coda.length) inviaBatch(coda[indiceCoda++]);
+      }
     });
   </script>
 </body>

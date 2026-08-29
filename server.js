@@ -71,7 +71,7 @@ app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
-app.post("/upload", upload.array("foto", 60), (req, res) => {
+app.post("/upload", upload.array("foto", 300), (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: "Nessuna foto ricevuta" });
   }

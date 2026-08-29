@@ -90,6 +90,23 @@
       display: none;
     }
     .card:hover .dl { display: block; }
+    .card .del {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(180,50,50,0.85);
+      border: none;
+      color: #fff;
+      font-size: 15px;
+      line-height: 26px;
+      text-align: center;
+      cursor: pointer;
+      display: none;
+    }
+    .card:hover .del { display: block; }
     .empty { color: #8a7d6b; font-style: italic; margin-top: 60px; text-align: center; }
     .lightbox {
       display: none;
@@ -201,16 +218,17 @@
           card.className = "card";
           var isVideo = /\.(mp4|mov|avi|webm)$/i.test(p.name);
           var preview;
+          var src = p.url || "/foto/" + p.name;
           if (isVideo) {
             preview = document.createElement("video");
-            preview.src = "/foto/" + p.name;
+            preview.src = src;
             preview.muted = true;
             preview.loop = true;
             preview.playsInline = true;
             preview.autoplay = true;
           } else {
             preview = document.createElement("img");
-            preview.src = "/foto/" + p.name;
+            preview.src = src;
             preview.loading = "lazy";
           }
           var dl = document.createElement("button");
@@ -221,9 +239,18 @@
             e.stopPropagation();
             scarica(p.name);
           };
-          card.onclick = function () { apriLightbox("/foto/" + p.name); };
+          var del = document.createElement("button");
+          del.className = "del";
+          del.textContent = "\u00D7";
+          del.setAttribute("aria-label", "Elimina");
+          del.onclick = function (e) {
+            e.stopPropagation();
+            elimina(p.name, card);
+          };
+          card.onclick = function () { apriLightbox(src); };
           card.appendChild(preview);
           card.appendChild(dl);
+          card.appendChild(del);
           grid.appendChild(card);
         });
       });
@@ -240,6 +267,25 @@
         a.click();
         URL.revokeObjectURL(url);
       });
+    }
+
+    function elimina(name, cardEl) {
+      if (!confirm("Eliminare questa foto?")) return;
+      api("/api/photos/" + encodeURIComponent(name), { method: "DELETE" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) throw new Error(d.error || "Errore durante l'eliminazione");
+          cardEl.remove();
+          var n = Math.max(0, parseInt(countEl.textContent) - 1);
+          countEl.textContent = n + " foto";
+          subEl.textContent = n > 0
+            ? n + " foto caricate dagli invitati"
+            : "Nessuna foto ancora";
+          emptyEl.style.display = n === 0 ? "block" : "none";
+        })
+        .catch(function (err) {
+          alert(err.message || "Errore durante l'eliminazione");
+        });
     }
 
     function apriLightbox(src) {

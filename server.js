@@ -11,6 +11,10 @@ const archiver = require("archiver");
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "albumfoto2025";
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const USE_TELEGRAM = !!(TELEGRAM_TOKEN && TELEGRAM_CHAT_ID);
+
 const S3_BUCKET = process.env.S3_BUCKET;
 const S3_REGION = process.env.S3_REGION || "us-east-1";
 const S3_ENDPOINT = process.env.S3_ENDPOINT || undefined;
@@ -28,6 +32,41 @@ if (!USE_S3 && !fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive:
 function genFilename(file) {
   const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
   return `${Date.now()}-${crypto.randomBytes(4).toString("hex")}${ext}`;
+}
+
+function tipoTelegram(mime) {
+  mime = (mime || "").toLowerCase();
+  if (/^image\/(jpeg|png|webp)$/.test(mime)) return "Photo";
+  if (/^video\/(mp4|webm)$/.test(mime)) return "Video";
+  return "Document";
+}
+
+async function contenutoFile(f) {
+  if (f.path) return fs.promises.readFile(f.path);
+  if (USE_S3 && f.key) {
+    const r = await s3Client.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: f.key }));
+    const chunks = [];
+    for await (const c of r.Body) chunks.push(c);
+    return Buffer.concat(chunks);
+  }
+  return null;
+}
+
+async function inviaTelegram(f) {
+  const buf = await contenutoFile(f);
+  if (!buf) return;
+  const tipo = tipoTelegram(f.mimetype);
+  const form = new FormData();
+  form.append("chat_id", TELEGRAM_CHAT_ID);
+  form.append(tipo.toLowerCase(), new Blob([buf]), f.originalname);
+  const r = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/send${tipo}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!r.ok) {
+    const body = await r.text();
+    throw new Error(`Telegram ${r.status}: ${body.slice(0, 200)}`);
+  }
 }
 
 const multerOpts = {
@@ -74,6 +113,11 @@ app.get("/admin", (req, res) => {
 app.post("/upload", upload.array("foto", 300), (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: "Nessuna foto ricevuta" });
+  }
+  if (USE_TELEGRAM) {
+    req.files.forEach(f => {
+      inviaTelegram(f).catch(err => console.error("Telegram:", err.message));
+    });
   }
   res.json({ ok: true, count: req.files.length });
 });

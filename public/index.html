@@ -112,6 +112,18 @@
     .status.ok { color: #5a8a5a; }
     .status.err { color: #9e3030; }
     .count { color: #8a7d6b; font-size: 0.95rem; margin-top: 12px; }
+    .comprimi {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
+      color: #8a7d6b;
+      font-size: 0.95rem;
+      font-style: italic;
+      cursor: pointer;
+    }
+    .comprimi input { width: 18px; height: 18px; accent-color: #a6926e; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -123,6 +135,8 @@
 
   <button class="btn btn-primary" id="btn-fotocamera" type="button">Scatta foto</button>
   <button class="btn btn-secondary" id="btn-galleria" type="button">Scegli dalla galleria</button>
+
+  <label class="comprimi"><input type="checkbox" id="comprimi" checked /> Comprimi foto per invio più veloce</label>
 
   <div class="thumbs" id="thumbs"></div>
   <p class="count" id="count"></p>
@@ -140,6 +154,7 @@
     var btnFotocamera = document.getElementById("btn-fotocamera");
     var btnGalleria = document.getElementById("btn-galleria");
     var btnInvia = document.getElementById("btn-invia");
+    var comprimiChk = document.getElementById("comprimi");
     var thumbs = document.getElementById("thumbs");
     var countEl = document.getElementById("count");
     var statusEl = document.getElementById("status");
@@ -216,10 +231,37 @@
       aggiornaUI();
     }
 
-    btnInvia.addEventListener("click", function () {
+    function comprimiInfoto(file) {
+      return new Promise(function (resolve) {
+        var tipo = (file.type || "").toLowerCase();
+        if (tipo.indexOf("video/") === 0 || tipo === "image/gif") return resolve(null);
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          URL.revokeObjectURL(url);
+          var MAX = 2000;
+          var scala = Math.min(1, MAX / Math.max(img.width, img.height));
+          var w = Math.round(img.width * scala);
+          var h = Math.round(img.height * scala);
+          var cv = document.createElement("canvas");
+          cv.width = w;
+          cv.height = h;
+          var ctx = cv.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          cv.toBlob(function (blob) {
+            if (!blob || blob.size >= file.size) return resolve(null);
+            resolve(new File([blob], file.name.replace(/\.(heic|heif|png|webp)$/i, ".jpg"), { type: "image/jpeg" }));
+          }, "image/jpeg", 0.85);
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+      });
+    }
+
+    function invia() {
       if (selezionate.length === 0) return;
 
-      statusEl.textContent = "";
+      statusEl.textContent = "Preparazione foto...";
       statusEl.className = "status";
       btnInvia.disabled = true;
       btnFotocamera.disabled = true;
@@ -227,82 +269,92 @@
       progressWrap.style.display = "block";
       progressBar.style.width = "0%";
 
-      var errore = 0;
-      var msgErrore = "";
-      var fatto = 0;
-      var inviato = 0;
-      var totale = 0;
-      selezionate.forEach(function (f) { totale += f.size; });
+      var promesse = selezionate.map(function (f) {
+        if (!comprimiChk.checked) return Promise.resolve(f);
+        return comprimiInfoto(f).then(function (b) { return b || f; });
+      });
 
-      var BATCH = 10;
-      var CONCORRENTI = 4;
-      var coda = [];
-      for (var i = 0; i < selezionate.length; i += BATCH) {
-        coda.push(selezionate.slice(i, i + BATCH));
-      }
-      var indiceCoda = 0;
+      Promise.all(promesse).then(function (pronti) {
+        statusEl.textContent = "";
+        var errore = 0;
+        var msgErrore = "";
+        var fatto = 0;
+        var inviato = 0;
+        var totale = 0;
+        pronti.forEach(function (f) { totale += f.size; });
 
-      function progress(pct) {
-        progressBar.style.width = pct + "%";
-      }
+        var BATCH = 10;
+        var CONCORRENTI = 4;
+        var coda = [];
+        for (var i = 0; i < pronti.length; i += BATCH) {
+          coda.push(pronti.slice(i, i + BATCH));
+        }
+        var indiceCoda = 0;
 
-      function inviaBatch(batch) {
-        var body = new FormData();
-        batch.forEach(function (f) {
-          body.append("foto", f, f.name || "foto.jpg");
-        });
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", "/upload");
-        xhr.upload.onprogress = function (e) {
-          if (e.lengthComputable && totale > 0) {
-            inviato += e.loaded;
-            progress(Math.min(100, Math.round((inviato / totale) * 100)));
-          }
-        };
-        xhr.onload = function () {
-          if (xhr.status !== 200) {
+        function progress(pct) {
+          progressBar.style.width = pct + "%";
+        }
+
+        function inviaBatch(batch) {
+          var body = new FormData();
+          batch.forEach(function (f) {
+            body.append("foto", f, f.name || "foto.jpg");
+          });
+          var xhr = new XMLHttpRequest();
+          xhr.open("POST", "/upload");
+          xhr.upload.onprogress = function (e) {
+            if (e.lengthComputable && totale > 0) {
+              inviato += e.loaded;
+              progress(Math.min(100, Math.round((inviato / totale) * 100)));
+            }
+          };
+          xhr.onload = function () {
+            if (xhr.status !== 200) {
+              errore++;
+              try { msgErrore = JSON.parse(xhr.responseText).error || msgErrore; } catch (e) {}
+            }
+            prossimo();
+          };
+          xhr.onerror = function () {
             errore++;
-            try { msgErrore = JSON.parse(xhr.responseText).error || msgErrore; } catch (e) {}
+            prossimo();
+          };
+          xhr.send(body);
+        }
+
+        function prossimo() {
+          fatto++;
+          if (indiceCoda < coda.length) {
+            inviaBatch(coda[indiceCoda++]);
+          } else if (fatto === coda.length) {
+            fine();
           }
-          prossimo();
-        };
-        xhr.onerror = function () {
-          errore++;
-          prossimo();
-        };
-        xhr.send(body);
-      }
-
-      function prossimo() {
-        fatto++;
-        if (indiceCoda < coda.length) {
-          inviaBatch(coda[indiceCoda++]);
-        } else if (fatto === coda.length) {
-          fine();
         }
-      }
 
-      function fine() {
-        progressWrap.style.display = "none";
-        btnFotocamera.disabled = false;
-        btnGalleria.disabled = false;
-        if (errore === 0) {
-          selezionate = [];
-          aggiornaUI();
-          progress(100);
-          statusEl.textContent = "Foto inviate. Grazie!";
-          statusEl.className = "status ok";
-        } else {
-          statusEl.textContent = msgErrore || (errore + " gruppo non inviato, riprova");
-          statusEl.className = "status err";
-          btnInvia.disabled = false;
+        function fine() {
+          progressWrap.style.display = "none";
+          btnFotocamera.disabled = false;
+          btnGalleria.disabled = false;
+          if (errore === 0) {
+            selezionate = [];
+            aggiornaUI();
+            progress(100);
+            statusEl.textContent = "Foto inviate. Grazie!";
+            statusEl.className = "status ok";
+          } else {
+            statusEl.textContent = msgErrore || (errore + " gruppo non inviato, riprova");
+            statusEl.className = "status err";
+            btnInvia.disabled = false;
+          }
         }
-      }
 
-      for (var k = 0; k < CONCORRENTI; k++) {
-        if (indiceCoda < coda.length) inviaBatch(coda[indiceCoda++]);
-      }
-    });
+        for (var k = 0; k < CONCORRENTI; k++) {
+          if (indiceCoda < coda.length) inviaBatch(coda[indiceCoda++]);
+        }
+      });
+    }
+
+    btnInvia.addEventListener("click", invia);
   </script>
 </body>
 </html>
